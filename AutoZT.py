@@ -16,7 +16,7 @@ def extract_ip(ip_string):
 
     # Return the first match (if any)
     return matches[0] if matches else None
-#huee
+#hueeasdasdas
 
 def traceroute():
 	result = subprocess.Popen(['traceroute', '-m 3', '-S', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
