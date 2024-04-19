@@ -6,7 +6,7 @@ import subprocess
 import re
 # import multithreading
 
-private_subnets = ['192.168.0.0/16', '172.16.0.0/16', '10.0.0.0/8']
+private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
 
 def extract_ip(ip_string):
 	ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
@@ -17,7 +17,7 @@ def extract_ip(ip_string):
     # Return the first match (if any)
     return matches[0] if matches else None
 #hueeasdasdas
-
+#$hiyasysya
 def traceroute():
 	result = subprocess.Popen(['traceroute', '-m 3', '-S', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 	# print(list(result.stdout))
