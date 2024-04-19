@@ -1,5 +1,4 @@
 import nmap
-import masscan
 import socket
 import argparse
 import subprocess
@@ -7,37 +6,68 @@ import re
 # import multithreading
 
 private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
+with open('common_ports.txt', 'r') as file:
+    # Read the lines of the file and store them as elements in a list
+    common_ports = file.readlines()
+str_common_ports = [ports.strip() for ports in common_ports]
+str_common_ports = ', '.join(str_common_ports)
+# print (str_common_ports)
 
 def extract_ip(ip_string):
-	ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
-
+    ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
     # Use re.findall to find all matches in the input string
-    matches = re.findall(ip_pattern, input_string)
+    matches = re.findall(ip_pattern, ip_string)
 
     # Return the first match (if any)
-    return matches[0] if matches else None
-#hueeasdasdas
-#$hiyasysya
-def traceroute():
-	result = subprocess.Popen(['traceroute', '-m 3', '-S', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if matches:
+    	return matches[0] 
+
+def traceroute(): #AKAN DIBUAT PARALEL DGN MULTITHREADING
+	# result = subprocess.Popen(['traceroute', '-m 3', '-S', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) #LINUX
+	result = subprocess.Popen(['tracert','-h','3','-w','1','-d','8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) #WINDOWS
 	# print(list(result.stdout))
+	# match = extract_ip(' '.join(list(result.stdout)))
+	# print(' '.join(list(result.stdout)))	
+	trace_subnet = []
 	for line in result.stdout:
-		print(line, end='')
+		regex_ip = extract_ip(line)
+		if regex_ip:
+			trace_subnet.append(regex_ip+'/24')
+		else:
+			pass
+	return trace_subnet
+
+def verify(target_host):
+	nm = nmap.PortScanner()
+	nm.scan(hosts='target_host')
+	print(nm.all_hosts())
+
+def deep_scan(target_host):
+	nm = nmap.PortScanner()
+	nm.scan(hosts='target_host', arguments='-p- -sV')
+	print(nm.csv())
 
 def probe(target_subnet):
-	traceroute()
-	result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	print(result.stdout.decode('utf-8'))
-	
-	mas = masscan.PortScanner() 
-	mas.scan(target_subnet, ports='1-1024', arguments='--max-rate 1000') 
-	print(mas.scan_result)
+	trace_subnet = traceroute()
+	trace_subnet = trace_subnet + target_subnet
+	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	# print(result.stdout.decode('utf-8'))
 
-def scan():
-	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	s.connect(("8.8.8.8", 80))
-	print(s.getsockname()[0])
-	s.close()
+
+	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet[1:]))
+	for trace in trace_subnet[1:]:
+		print("PROBE: \t" + trace)
+		probe_scan = subprocess.Popen(['masscan','-p' + str_common_ports, trace], bufsize=100000, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		for probe in probe_scan.stdout:
+			regex_host_ip = extract_ip(str(probe))
+			if regex_host_ip:
+				print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
+				verify(regex_host_ip)
+				deep_scan(regex_host_ip)
+			else:
+				pass
+
+
 
 def identify():
 	pass
@@ -49,11 +79,10 @@ def parsearg():
 	parser.add_argument('--int', required=False, help='Select NIC to perform scanning')
 
 	args = parser.parse_args()
-	print(args.subnet)
 	if args.subnet:
 		probe(args.subnet)
 	else:
-		probe(private_subnets[0])
+		probe(private_subnets)
 
 parsearg()
 
