@@ -9,9 +9,10 @@ Masscan (accessible from terminal/cmd)
 
 Installation
 Clone the repo
-git clone https://github.com/your-username/network-scanner.git
+git clone https://github.com/numburanggata/AutoZT.git
 
 Usage
-1. Open your terminal or command prompt.
-2. Navigate to the directory where you cloned the repository.
-3. Run python network_scanner.py. Follow the on-screen instructions to specify the target IP range and scan options.
+1. Connect your host into the target network.
+2. Open your terminal or command prompt.
+3. Navigate to the directory where you cloned the repository.
+4. Run python AutoZT.py. Follow the on-screen instructions to specify the target IP range and scan options.
