@@ -4,6 +4,7 @@ import argparse
 import subprocess
 import re
 import multiprocessing
+import time
 
 private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
 with open('common_ports.txt', 'r') as file:
@@ -57,7 +58,7 @@ def probe(target_subnet):
 	# print(result.stdout.decode('utf-8'))
 
 
-	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet))
+	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet	))
 	for trace in trace_subnet:
 		print("PROBE: \t" + trace)
 		probe_scan = subprocess.Popen(['masscan','-p' + str_common_ports, trace], bufsize=100000, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
