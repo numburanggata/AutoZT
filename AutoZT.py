@@ -5,14 +5,37 @@ import subprocess
 import re
 import multiprocessing
 import time
+import csv
+from tabulate import tabulate
 
-private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
-with open('common_ports.txt', 'r') as file:
+
+private_subnets = ['192.168.0.0/24','192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
+
+queue = multiprocessing.Queue()
+with multiprocessing.Manager() as manager:
+	hosts = manager.dict()
+	hosts['sample'] = [
+		{"ip": "x.x.x.x", "state": "up", "ports": ("21 (VSFTPD)" , "22 (SSHD)")}
+	]
+
+with open('ca_temp.txt', 'w') as f:
+	f.write(f"x.x.x.x,up/down,port(service)\n")	
+
+	
+with open('15common_ports.txt', 'r') as file:
     # Read the lines of the file and store them as elements in a list
     common_ports = file.readlines()
 str_common_ports = [ports.strip() for ports in common_ports]
 str_common_ports = ', '.join(str_common_ports)
 # print (str_common_ports)
+
+def show_ca_result():
+	with open('ca_temp.txt', 'r') as f:
+		reader = csv.reader(f)
+		data = [row for row in reader if row]
+	headers = ["IP", "State", "Ports"]
+	table = tabulate (data, headers, tablefmt="grid")
+	print(table)
 
 def extract_ip(ip_string):
     ip_pattern = r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b'
@@ -25,16 +48,16 @@ def extract_ip(ip_string):
 
 def traceroute(): #AKAN DIBUAT PARALEL DGN MULTITHREADING
 	print("INISIASI TRACEROUTE...")
-	result = subprocess.Popen(['traceroute', '-m 3', '-S', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) #LINUX
+	result = subprocess.Popen(['traceroute', '8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) #LINUX
 	# result = subprocess.Popen(['tracert','-h','3','-w','1','-d','8.8.8.8'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) #WINDOWS
 	# print(list(result.stdout))
 	# match = extract_ip(' '.join(list(result.stdout)))
 	# print(' '.join(list(result.stdout)))	
 	trace_subnet = []
 	for line in result.stdout:
-		print(line)
+		#print(line)
 		regex_ip = extract_ip(line)
-		if regex_ip != "8.8.8.8":
+		if regex_ip != "8.8.8.8" and regex_ip+'/24' not in trace_subnet:
 			trace_subnet.append(regex_ip+'/24')
 		else:
 			pass
@@ -43,13 +66,51 @@ def traceroute(): #AKAN DIBUAT PARALEL DGN MULTITHREADING
 
 def verify(target_host):
 	nm = nmap.PortScanner()
-	nm.scan(hosts='target_host')
-	print(nm.all_hosts())
+	nm.scan(hosts=target_host)
+	if nm.all_hosts():
+		#hosts[target_host] = {
+		#	"ip": target_host, 
+		#	"state": "up", 
+		#	"ports": None
+		#}
+		#with open('ca_temp.txt', 'a') as f:
+		#	f.write(f"{target_host},up,<deep scanning...>\n")
+		#found_host = {"ip": target_host, "state": "up", "ports": None}
+		#hosts.append(found_host)
+		print(target_host + " is UP, performing deep scan.")
+		deep_scan(target_host)
+		#print("HOSTS: \t", hosts)
+		
+	else:
+		#hosts[target_host] = {
+		#	"ip": target_host, 
+		#	"state": "down", 
+		#	"ports": None
+		#}
+		with open('ca_temp.txt', 'a') as f:
+			f.write(f"{target_host},up,-\n")
+		#found_host = {"ip": target_host, "state": "down", "ports": None}
+		#hosts.append(found_host)
+		print(target_host + " is likely DOWN")
+		show_ca_result()
+		#print("HOSTS: \t", hosts)
+		
 
 def deep_scan(target_host):
 	nm = nmap.PortScanner()
-	nm.scan(hosts='target_host', arguments='-p22,80,443 -sV')
-	print(nm.csv())
+	nm.scan(hosts=target_host, arguments='-A')
+	results = []
+	for protocol in nm[target_host].all_protocols():
+		ports = nm[target_host][protocol].keys()
+		for port in sorted(ports):
+			service = nm[target_host][protocol][port]['name']
+			state = nm[target_host][protocol][port]['state']
+			if state == "open":
+				results.append(f"{port}({service})")
+	format_result = ";".join(results)
+	with open('ca_temp.txt', 'a') as f:
+		f.write(f"{target_host},up,{format_result}\n")
+	show_ca_result()
 
 def probe(target_subnet):
 	trace_subnet = traceroute()
@@ -57,22 +118,60 @@ def probe(target_subnet):
 	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	# print(result.stdout.decode('utf-8'))
 
+	
+	
 
 	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet	))
+	last_probe_time = time.time()
+	
 	for trace in trace_subnet:
 		print("PROBE: \t" + trace)
-		probe_scan = subprocess.Popen(['masscan','-p' + str_common_ports, trace], bufsize=100000, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		for probe in probe_scan.stdout:
-			print(probe)
-			regex_host_ip = extract_ip(str(probe))
-			if regex_host_ip:
-				print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
-				multiprocessing.Process(target=verify, args=(regex_host_ip,)).start()
-				# verify(regex_host_ip)
-				# deep_scan(regex_host_ip)
-			else:
-				pass
+		#print("HOSTS: \t", hosts)
+		#for host in hosts.values():
+		#	print(host)
+		probe_scan = subprocess.Popen(['sudo', 'masscan','-p' + str_common_ports, trace], bufsize=100000, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		#stdout, stderr = probe_scan.communicate()
+		#if probe_scan.returncode != 0:
+		#print((probe_scan.stderr).decode('utf-8'))
+		processes = []
+		while True:
+			output = probe_scan.stdout.readline()
+			#print(output)
+			if output:
+				last_probe_time = time.time()
+				for p in processes:
+					p.join()
+				print(output.strip().decode())
+				regex_host_ip = extract_ip(str(output.strip().decode()))
+				#print(regex_host_ip)
+				if regex_host_ip:
+					#host_exist = any(host["ip"] == regex_host_ip for host in hosts)
+					host_exist = False
+					with open('ca_temp.txt', 'r') as f:
+						for line in f:
+							ip, _, _ = line.strip().split(',')
+							if ip == regex_host_ip:
+								host_exist = True
+					if host_exist:
+						pass
+					else:
+						print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
+						host_state = multiprocessing.Process(target=verify, args=(regex_host_ip,))
+						host_state.start()
+						
+						processes.append(host_state)
+						#verify(regex_host_ip)
+						
+					
 
+						# verify(regex_host_ip)
+						# deep_scan(regex_host_ip)
+				else:
+					pass
+			if probe_scan.poll() is not None:
+				print("PROBE SUBNET SELESAI")
+				#show_ca_result()
+				break
 
 
 def identify():
