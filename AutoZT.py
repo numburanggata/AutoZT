@@ -7,6 +7,10 @@ import multiprocessing
 import time
 import csv
 from tabulate import tabulate
+import ipaddress
+
+
+
 
 
 private_subnets = ['192.168.0.0/24','192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
@@ -18,8 +22,8 @@ with multiprocessing.Manager() as manager:
 		{"ip": "x.x.x.x", "state": "up", "ports": ("21 (VSFTPD)" , "22 (SSHD)")}
 	]
 
-with open('ca_temp.txt', 'w') as f:
-	f.write(f"x.x.x.x,up/down,port(service)\n")	
+with open('ca_temp.txt', 'a') as f:
+	f.write("")	
 
 	
 with open('15common_ports.txt', 'r') as file:
@@ -88,7 +92,7 @@ def verify(target_host):
 		#	"ports": None
 		#}
 		with open('ca_temp.txt', 'a') as f:
-			f.write(f"{target_host},up,-\n")
+			f.write(f"{target_host},filtered,-\n")
 		#found_host = {"ip": target_host, "state": "down", "ports": None}
 		#hosts.append(found_host)
 		print(target_host + " is likely DOWN")
@@ -117,9 +121,6 @@ def probe(target_subnet):
 	trace_subnet = trace_subnet + target_subnet
 	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	# print(result.stdout.decode('utf-8'))
-
-	
-	
 
 	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet	))
 	last_probe_time = time.time()
@@ -169,16 +170,55 @@ def probe(target_subnet):
 				else:
 					pass
 			if probe_scan.poll() is not None:
-				print("PROBE SUBNET SELESAI")
+				print("PROBE SUBNET BERIKUTNYA...")
 				#show_ca_result()
 				break
+	print("PROBE SUBNET SELESAI")
 
+def classify_subnets():
+	subnets = {}
+	with open('ca_temp.txt', 'r') as f:
+		reader = csv.reader(f)
+		data = [row for row in reader if row]
 
-def identify():
-	pass
+	for ip in data:
+		ip_addr = ipaddress.ip_address(ip[0])
+		# subnet_found = False
+		for subnet in subnets:
+			if ip_addr in subnet:
+				#print(ip_addr, subnet)
+				subnets[subnet].append(ip[0])
+				# subnet_found = True
+				# print(subnets)
+      
+        # if not subnet_found:
+		for cidr in range(29, 21, -1): 
+			subnet = ipaddress.ip_network(f"{ip[0]}/{cidr}", strict=False)
+			# if any(ipaddress.ip_address(ip) in subnet for ip in ip_list):
+			if subnet not in subnets:
+				subnets[subnet] = [ip[0]]
+			else:
+				pass
+				# print(subnet, ip, cidr)
+
+	#print(subnets.items())
+	confidence = {}
+	for subnet, ips in subnets.items():
+		#print(subnet, ips)
+		cidr = (str(subnet).split('/'))[1]
+		available_host = ((32 - int(cidr)) ** 2) - 2 
+		confid = 100*(len(ips)/available_host)
+		confidence[subnet] = confid
+		print(f"Subnet {subnet}: {ips} " + str(confid) + "%")
+	print(max(confidence))
+	# cidr_ = ipaddress.ip_address
+	# 
+	# print(host_percentage)
+	# return subnets
+
 
 def parsearg():
-	banner = "     e                 d8             ~~~~d88P ~~~888~~~ \n    d8b     888  888 _d88__  e88~-_      d88P     888    \n   /Y88b    888  888  888   d888   i    d88P      888    \n  /  Y88b   888  888  888   8888   |   d88P       888    \n /____Y88b  888  888  888   Y888   '  d88P        888    \n/      Y88b \"88_-888  \"88_/  \"88_-~  d88P____     888    \nNetwork scanner to measure Zero Trust Implementation by ReiKT. -h for help"
+	banner = "     e                 d8             ~~~~d88P ~~~888~~~ \n    d8b     888  888 _d88__  e88~-_      d88P     888    \n   /Y88b    888  888  888   d888   i    d88P      888    \n  /  Y88b   888  888  888   8888   |   d88P       888    \n /____Y88b  888  888  888   Y888   '  d88P        888    \n/      Y88b \"88_-888  \"88_/  \"88_-~  d88P____     888    \nAutomated Zero Trust Architecture by ReiKT. -h for help"
 	print(banner)
 	parser = argparse.ArgumentParser(description='Make sure masscan and nmap is installed and accessible from terminal/cmd')
 	parser.add_argument('--subnet', required=False, help='Scan specific subnet')
@@ -188,8 +228,10 @@ def parsearg():
 	args = parser.parse_args()
 	if args.subnet:
 		probe(args.subnet)
+		classify_subnets()
 	else:
 		probe(private_subnets)
+		classify_subnets()
 
 parsearg()
 
