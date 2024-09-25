@@ -21,7 +21,6 @@ with multiprocessing.Manager() as manager:
 with open('ca_temp.txt', 'a') as f:
 	f.write("")	
 
-	
 with open('15common_ports.txt', 'r') as file:
     # Read the lines of the file and store them as elements in a list
     common_ports = file.readlines()
