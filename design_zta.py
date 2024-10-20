@@ -4,36 +4,197 @@ from dash import dcc, html
 from dash.dependencies import Input, Output, State
 import pandas as pd
 import webbrowser
+import ipaddress
 
 data = {
-    "Policy Number": ["P001", "P002", "P003"],
-    "Source Zone": ["Zone1", "Zone2", "Zone3"],
-    "Source Address": ["192.168.1.1", "192.168.1.2", "192.168.1.3"],
-    "Dest Zone": ["ZoneA", "ZoneB", "ZoneC"],
-    "Dest Address": ["10.0.0.1", "10.0.0.2", "10.0.0.3"],
-    "Protocol": ["TCP", "UDP", "ICMP"],
-    "Port": [80, 53, 0],
-    "Action": ["Permit", "Deny", "Permit"]
+    "Policy Number": ["01", "02", "03", "04", "05", "06"],
+    "Source Zone": ["Internet", "Internet", "Staff", "Staff", "Serverfarm", "Serverfarm"],
+    "Source Address": ["0.0.0.0/0","0.0.0.0/0", "192.168.1.0/24","192.168.1.0/24", "192.168.100.0/24","192.168.100.0/24"],
+    "Dest Zone": ["Serverfarm", "Staff", "Internet", "Serverfarm", "Staff", "Internet"],
+    "Dest Address": ["192.168.100.0/24", "192.168.1.0/24", "0.0.0.0/0", "192.168.100.0/24","192.168.1.0/24", "0.0.0.0/0"],
+    "Protocol": ["TCP", "UDP", "ICMP","ANY", "ANY", "ANY"],
+    "Port": ["80,443", "53", "0", "ANY", "ANY", "ANY"],
+    "Action": ["PERMIT", "DENY", "PERMIT","DENY","DENY","DENY"]
 }
+
+protocol_options = [
+    {"label": "TCP", "value": "TCP"},
+    {"label": "UDP", "value": "UDP"},
+    {"label": "ICMP", "value": "ICMP"},
+    {"label": "ANY", "value": "ANY"}
+]
+
+action_options = [
+    {"label": "PERMIT", "value": "PERMIT"},
+    {"label": "DENY", "value": "DENY"}
+]
 
 df = pd.DataFrame(data)
 
 app = dash.Dash(__name__)
 
-app.layout = html.Div([
-    dash_table.DataTable(
-        id='editable-table',
-        columns=[{"name": i, "id": i, "deletable": False, "renamable": False} for i in df.columns],
-        data=df.to_dict('records'),
-        editable=True,
-        row_deletable=True,
-        page_size=10
-    ),
-    html.Button('Save Changes', id='save-btn', n_clicks=0),
-    html.Button('Export to Cisco ACL', id='export-btn', n_clicks=0),
-    dcc.Store(id='memory-output'),
-    html.Pre(id='acl-output', style={'whiteSpace': 'pre-wrap'})  # To display the ACL output
-])
+app.layout = html.Div(
+
+    style={
+        'fontFamily': 'Arial, sans-serif',
+        'backgroundColor': '#f0f2f5',
+        'padding': '20px'
+    },
+    children=[
+        # Title Section
+        html.Div(
+            style={
+                'textAlign': 'center',
+                'padding': '10px',
+                'backgroundColor': '#4CAF50',
+                'color': 'white',
+                'borderRadius': '5px',
+                'boxShadow': '0 4px 8px 0 rgba(0,0,0,0.2)',
+                'marginBottom': '20px'
+            },
+            children=[
+                html.H1("Langkah 3: Design ZTA", style={'margin': '0'})
+            ]
+        ),
+    html.Div(
+            style={
+                'backgroundColor': 'white',
+                'padding': '20px',
+                'borderRadius': '5px',
+                'boxShadow': '0 4px 8px 0 rgba(0,0,0,0.2)'
+            },
+            children=[
+            dash_table.DataTable(
+                id='editable-table',
+                columns=[
+                    {"name": "No.", "id": "Policy Number", "deletable": False, "renamable": False},
+                    {"name": "Source Zone", "id": "Source Zone", "deletable": False, "renamable": False},
+                    {"name": "Source Address", "id": "Source Address", "deletable": False, "renamable": False},
+                    {"name": "Dest Zone", "id": "Dest Zone", "deletable": False, "renamable": False},
+                    {"name": "Dest Address", "id": "Dest Address", "deletable": False, "renamable": False},
+                    {"name": "Protocol", "id": "Protocol", "deletable": False, "renamable": False, "presentation": "dropdown"},
+                    {"name": "Port", "id": "Port", "deletable": False, "renamable": False},
+                    {"name": "Action", "id": "Action", "deletable": False, "renamable": False, "presentation": "dropdown"}
+                ],
+                data=df.to_dict('records'),
+                dropdown={
+                    'Protocol': { 'options': protocol_options},
+                    'Action': { 'options': action_options}
+                },
+                editable=True,
+                row_deletable=True,
+                page_size=10,
+                style_table={
+                        'overflowX': 'auto'
+                    },
+                    style_cell={
+                        'textAlign': 'left',
+                        'padding': '8px',
+                        'minWidth': '100px',
+                        'maxWidth': '180px',
+                        'whiteSpace': 'normal',
+                        'fontSize': '14px'
+                    },
+                    style_header={
+                        'backgroundColor': '#4CAF50',
+                        'color': 'white',
+                        'fontWeight': 'bold',
+                        'fontSize': '16px'
+                    },
+                    style_data={
+                        'border': '1px solid #ddd'
+                    },
+                    style_data_conditional=[
+                        {
+                            'if': {'row_index': 'odd'},
+                            'backgroundColor': '#f9f9f9'
+                        },
+                        {
+                            'if': {'state': 'active'},  # Active cell
+                            'backgroundColor': '#d1e7dd',
+                            'border': '1px solid #4CAF50'
+                        },
+                        {
+                            'if': {'column_id': 'Action'},
+                            'color': 'white',
+                            'backgroundColor': '#add8e6',
+                            'fontWeight': 'bold'
+                        }
+                    ],
+                    css=[
+                        {
+                            'selector': '.dash-spreadsheet td div',
+                            'rule': 'line-height: 15px;'
+                        }
+                    ]
+                ),
+            ]
+        ),
+    html.Div(
+            style={
+                'marginTop': '20px',
+                'textAlign': 'center'
+            },
+            children=[
+                html.Button(
+                    'Save Changes',
+                    id='save-btn',
+                    n_clicks=0,
+                    style={
+                        'backgroundColor': '#4CAF50',
+                        'color': 'white',
+                        'padding': '10px 20px',
+                        'marginRight': '10px',
+                        'border': 'none',
+                        'borderRadius': '4px',
+                        'cursor': 'pointer',
+                        'fontSize': '16px'
+                    }
+                ),
+                html.Button(
+                    'Export to Cisco ACL',
+                    id='export-btn',
+                    n_clicks=0,
+                    style={
+                        'backgroundColor': '#008CBA',
+                        'color': 'white',
+                        'padding': '10px 20px',
+                        'border': 'none',
+                        'borderRadius': '4px',
+                        'cursor': 'pointer',
+                        'fontSize': '16px'
+                    }
+                )
+            ]
+        ),
+        
+        # Output Section
+        html.Div(
+            style={
+                'marginTop': '30px',
+                'backgroundColor': '#ffffff',
+                'padding': '20px',
+                'borderRadius': '5px',
+                'boxShadow': '0 4px 8px 0 rgba(0,0,0,0.1)'
+            },
+            children=[
+                html.H2("ACL Output", style={'textAlign': 'center', 'color': '#333'}),
+                html.Pre(
+                    id='acl-output',
+                    style={
+                        'whiteSpace': 'pre-wrap',
+                        'backgroundColor': '#f9f9f9',
+                        'padding': '15px',
+                        'borderRadius': '5px',
+                        'border': '1px solid #ddd',
+                        'fontSize': '14px',
+                        'maxHeight': '400px',
+                        'overflowY': 'auto'
+                    }
+                )
+            ]
+        )
+    ])
 
 @app.callback(
     Output('acl-output', 'children'),
@@ -71,15 +232,27 @@ def export_to_cisco_acl(rows):
         action = row["Action"].lower()  # Convert to lowercase for Cisco syntax
         protocol = row["Protocol"].lower()
         src_address = row["Source Address"]
+        
+        src_network = ipaddress.IPv4Network(src_address, strict=False)
+        src_network_address = str(src_network.network_address)
+        src_subnet_mask = str(src_network.netmask)
+        
         dst_address = row["Dest Address"]
+
+        dst_network = ipaddress.IPv4Network(dst_address, strict=False)
+        dst_network_address = str(dst_network.network_address)
+        dst_subnet_mask = str(dst_network.netmask)
+
         port = row["Port"]
         
         # Construct the ACL command in extended IP access-list format
-        if port != 0:  # If there's a port number, include it in the ACL command
-            acl_command = f"{seq_number} {action} {protocol} {src_address} any eq {port} {dst_address} any"
+        if port != 0 and port != "ANY":  # If there's a port number, include it in the ACL command
+            acl_command = f"{seq_number} {action} {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask} eq {port}"
+        elif port == "ANY":
+            acl_command = f"{seq_number} ip {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask}"
         else:
-            acl_command = f"{seq_number} {action} {protocol} {src_address} any {dst_address} any"
-        
+            acl_command = f"{seq_number} ip {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask}"
+
         acl_commands.append(acl_command)
         seq_number += 2  # Increment sequence number by 5
 
