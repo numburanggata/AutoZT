@@ -53,7 +53,7 @@ app.layout = html.Div(
                 'marginBottom': '20px'
             },
             children=[
-                html.H1("Langkah 3: Design ZTA", style={'margin': '0'})
+                html.H1("Design ZTA", style={'margin': '0'})
             ]
         ),
     html.Div(
@@ -218,6 +218,7 @@ def handle_buttons(save_clicks, export_clicks, rows):
     elif button_id == 'export-btn':
         if export_clicks > 0:
             acl_commands = export_to_cisco_acl(rows)
+            print(acl_commands)
             print("Policies exported to 'cisco_acl.txt'")
             return acl_commands
     

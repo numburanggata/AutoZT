@@ -9,14 +9,14 @@ import csv
 from tabulate import tabulate
 import ipaddress
 
-private_subnets = ['192.168.0.0/24','192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
+private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.1.1.0/24']
 
-queue = multiprocessing.Queue()
-with multiprocessing.Manager() as manager:
-	hosts = manager.dict()
-	hosts['sample'] = [
-		{"ip": "x.x.x.x", "state": "up", "ports": ("21 (VSFTPD)" , "22 (SSHD)")}
-	]
+# queue = multiprocessing.Queue()
+# with multiprocessing.Manager() as manager:
+	# hosts = manager.dict()
+	# hosts['sample'] = [
+		# {"ip": "x.x.x.x", "state": "up", "ports": ("21 (VSFTPD)" , "22 (SSHD)")}
+	# ]
 
 with open('ca_temp.txt', 'a') as f:
 	f.write("")	
@@ -55,16 +55,18 @@ def traceroute(): #AKAN DIBUAT PARALEL DGN MULTITHREADING
 	# print(' '.join(list(result.stdout)))	
 	trace_subnet = []
 	for line in result.stdout:
-		#print(line)
+		print(line)
 		regex_ip = extract_ip(line)
-		if regex_ip != "8.8.8.8" and regex_ip+'/24' not in trace_subnet:
-			trace_subnet.append(regex_ip+'/24')
-		else:
-			pass
+		if regex_ip:
+			if regex_ip != "8.8.8.8" and regex_ip+'/24' not in trace_subnet:
+				trace_subnet.append(regex_ip+'/24')
+			else:
+				pass
 	print(trace_subnet)
 	return trace_subnet
 
 def verify(target_host):
+	# print(target_host)
 	nm = nmap.PortScanner()
 	nm.scan(hosts=target_host)
 	if nm.all_hosts():
@@ -98,7 +100,7 @@ def verify(target_host):
 
 def deep_scan(target_host):
 	nm = nmap.PortScanner()
-	nm.scan(hosts=target_host, arguments='-A')
+	nm.scan(hosts=target_host, arguments='-T4 -p- --open')
 	results = []
 	for protocol in nm[target_host].all_protocols():
 		ports = nm[target_host][protocol].keys()
@@ -113,13 +115,14 @@ def deep_scan(target_host):
 	show_ca_result()
 
 def probe(target_subnet):
-	trace_subnet = traceroute()
+	# trace_subnet = traceroute()   ## BYPASS 
+	trace_subnet = ['192.168.88.153/24']
 	trace_subnet = trace_subnet + target_subnet
 	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	# print(result.stdout.decode('utf-8'))
 
 	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet	))
-	last_probe_time = time.time()
+	
 	
 	for trace in trace_subnet:
 		print("PROBE: \t" + trace)
@@ -129,18 +132,28 @@ def probe(target_subnet):
 		probe_scan = subprocess.Popen(['sudo', 'masscan','-p' + str_common_ports, trace], bufsize=100000, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		#stdout, stderr = probe_scan.communicate()
 		#if probe_scan.returncode != 0:
-		#print((probe_scan.stderr).decode('utf-8'))
+		# print((probe_scan.stderr).decode('utf-8'))
+		last_probe_time = time.time()
 		processes = []
+		probe_counter = 0
 		while True:
 			output = probe_scan.stdout.readline()
-			#print(output)
+			# print('1')
 			if output:
-				last_probe_time = time.time()
-				for p in processes:
-					p.join()
-				print(output.strip().decode())
+				probe_counter += 1
+				probe_time = time.time()
+				probe_check = probe_time - last_probe_time
+				# print(probe_check, probe_time, last_probe_time)
+				if probe_check <= 1 and probe_counter == 10:
+					print('Failed Probe, moving on...')
+					for p in processes:
+						if p.is_alive():  # Check if the process is still running
+							p.terminate()  # Terminate the process
+							p.join()  # Clean up the process resources
+					break
+				# print(output.strip().decode())
 				regex_host_ip = extract_ip(str(output.strip().decode()))
-				#print(regex_host_ip)
+				# print(regex_host_ip)
 				if regex_host_ip:
 					#host_exist = any(host["ip"] == regex_host_ip for host in hosts)
 					host_exist = False
@@ -155,20 +168,22 @@ def probe(target_subnet):
 						print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
 						host_state = multiprocessing.Process(target=verify, args=(regex_host_ip,))
 						host_state.start()
-						
+						# print('process started')
 						processes.append(host_state)
 						#verify(regex_host_ip)
-						
-					
-
+						# print('process appended')
 						# verify(regex_host_ip)
 						# deep_scan(regex_host_ip)
 				else:
 					pass
+			
 			if probe_scan.poll() is not None:
 				print("PROBE SUBNET BERIKUTNYA...")
 				#show_ca_result()
 				break
+		for p in processes:
+				p.join()
+
 	print("PROBE SUBNET SELESAI")
 
 def classify_subnets():
@@ -229,7 +244,10 @@ def parsearg():
 		probe(private_subnets)
 		classify_subnets()
 
-parsearg()
+
+
+if __name__ == "__main__":
+	parsearg()
 
 # nm = nmap.PortScanner()
 # nm.scan(hosts="10.10.29.131", arguments='-T5 -sV')

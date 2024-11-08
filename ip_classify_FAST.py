@@ -157,6 +157,40 @@ def classify_subnets(ip_list):
     return(ip_data)
 
 
+def generate_vlan_config(subnets, zones):
+    config_lines = []
+
+    vlan_id = 10  # Starting VLAN ID; adjust as needed
+    for index, subnet in enumerate(subnets):
+        # Calculate the network address and subnet mask
+        subnet_info = subnet.split('/')
+        network_address = subnet_info[0]
+        subnet_mask = int(subnet_info[1])
+
+        # Determine VLAN name, defaulting to "VLAN_<vlan_id>" if the zone is empty
+        vlan_name = zones[index] if index < len(zones) and zones[index] else f"VLAN_{vlan_id}"
+
+        # Create VLAN configuration
+        config_lines.append(f"vlan {vlan_id}")
+        config_lines.append(f" name {vlan_name}")
+        config_lines.append("!")
+
+        # Configure the VLAN interface
+        config_lines.append(f"interface Vlan{vlan_id}")
+        config_lines.append(f" ip address {network_address} {subnet_mask_to_cidr(subnet_mask)}")
+        config_lines.append(" no shutdown")
+        config_lines.append("!")
+
+        vlan_id += 1
+
+    return "\n".join(config_lines)
+
+
+def subnet_mask_to_cidr(mask_bits):
+    # Converts subnet mask bits into a CIDR format
+    bits = (0xffffffff >> (32 - mask_bits)) << (32 - mask_bits)
+    return f"{(bits >> 24) & 0xff}.{(bits >> 16) & 0xff}.{(bits >> 8) & 0xff}.{bits & 0xff}"
+
 
 
 
@@ -227,6 +261,14 @@ probed_subnets = {
     for key, values in probed_subnets.items()
 }
 # print(probed_subnets)   
+# print('items 2')
+# print(items[2])
+
+
+recommended_zones = [""] * len(items[3][1])
+    
+items.append(['Network Zone', recommended_zones])
+
 recommended_subnets = dict(items[3:])
 
 # print(probed_subnets, recommended_subnets)
@@ -242,7 +284,7 @@ recommended_subnets = dict(items[3:])
 
 # print(recommended_subnets)
 
-recommended_subnets = {'Recommended Network Address': ['192.168.3.0/29', '192.168.1.0/29', '192.168.1.8/29', '192.168.1.16/29', '192.168.3.8/29'], 'Recommended Network Hosts': ['192.168.3.1, 192.168.3.2, 192.168.3.3, 192.168.3.4, 192.168.3.5, 192.168.3.6, 192.168.3.7', '192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.1.4, 192.168.1.5, 192.168.1.6, 192.168.1.7', '192.168.1.9, 192.168.1.10, 192.168.1.11, 192.168.1.12, 192.168.1.13, 192.168.1.14, 192.168.1.15', '192.168.1.16, 192.168.1.17, 192.168.1.19, 192.168.1.20, 192.168.1.21, 192.168.1.22', '192.168.3.9, 192.168.3.10, 192.168.3.11, 192.168.3.12']}
+# recommended_subnets = {'Recommended Network Address': ['192.168.3.0/29', '192.168.1.0/29', '192.168.1.8/29', '192.168.1.16/29', '192.168.3.8/29'], 'Recommended Network Hosts': ['192.168.3.1, 192.168.3.2, 192.168.3.3, 192.168.3.4, 192.168.3.5, 192.168.3.6, 192.168.3.7', '192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.1.4, 192.168.1.5, 192.168.1.6, 192.168.1.7', '192.168.1.9, 192.168.1.10, 192.168.1.11, 192.168.1.12, 192.168.1.13, 192.168.1.14, 192.168.1.15', '192.168.1.16, 192.168.1.17, 192.168.1.19, 192.168.1.20, 192.168.1.21, 192.168.1.22', '192.168.3.9, 192.168.3.10, 192.168.3.11, 192.168.3.12']}
 
 
 # Convert sample data to DataFrame
@@ -270,7 +312,7 @@ app.layout = html.Div(style={
                 'marginBottom': '30px'
             },
             children=[
-                html.H1("Langkah 2: Klasifikasi Subnet", style={'margin': '0'})
+                html.H1("Subnet Miscrosegmentation", style={'margin': '0'})
             ]
         ),
 
@@ -352,7 +394,7 @@ app.layout = html.Div(style={
                     columns=[
                         {"name": "Recommended Network Address", "id": "Recommended Network Address", "deletable": False, "renamable": False},
                         {"name": "Recommended Network Hosts", "id": "Recommended Network Hosts", "deletable": False, "renamable": False},
-                        {"name": "Recommended Network Zone", "id": "Recommended Network Zone", "deletable": False, "renamable": False}
+                        {"name": "Network Zone", "id": "Network Zone", "deletable": False, "renamable": False}
                     ],
                     data=df_recommended.to_dict('records'),
                     editable=True,  # Recommended networks are output only
@@ -437,20 +479,6 @@ app.layout = html.Div(style={
                         'cursor': 'pointer',
                         'fontSize': '16px'
                     }
-                ),
-                html.Button(
-                    'Reset Tables',
-                    id='reset-btn',
-                    n_clicks=0,
-                    style={
-                        'backgroundColor': '#f44336',
-                        'color': 'white',
-                        'padding': '10px 20px',
-                        'border': 'none',
-                        'borderRadius': '4px',
-                        'cursor': 'pointer',
-                        'fontSize': '16px'
-                    }
                 )
             ]
         ),
@@ -458,15 +486,16 @@ app.layout = html.Div(style={
         # Output Area Section
         html.Div(
             style={
-                'backgroundColor': 'white',
+                'marginTop': '30px',
+                'backgroundColor': '#ffffff',
                 'padding': '20px',
                 'borderRadius': '5px',
-                'boxShadow': '0 4px 8px 0 rgba(0,0,0,0.2)'
+                'boxShadow': '0 4px 8px 0 rgba(0,0,0,0.1)'
             },
             children=[
-                html.H2("Classification Output", style={'textAlign': 'center', 'color': '#333'}),
+                html.H2('Miscrosegmentation Config', style={'textAlign': 'center', 'color': '#333'}),
                 html.Pre(
-                    id='output-area',
+                    id='microseg-output',
                     style={
                         'whiteSpace': 'pre-wrap',
                         'backgroundColor': '#f9f9f9',
@@ -484,123 +513,41 @@ app.layout = html.Div(style={
 )
 
 @app.callback(
-        # Output('probed-table', 'data'),
-        Output('recommended-table', 'data')
-        # Output('output-area', 'children')
-    ,
-    
-        # Input('classify-btn', 'n_clicks'),
-        # Input('reset-btn', 'n_clicks'),
-        Input('add-row-btn', 'n_clicks')
-    ,
-    
-        # State('recommended-table', 'data')
-        State('recommended-table', 'data')
-    
+    [Output('recommended-table', 'data'), Output('microseg-output', 'children')],
+    [Input('add-row-btn', 'n_clicks'),Input('classify-btn', 'n_clicks')],
+    State('recommended-table', 'data')
 )
 
-def add_row(n_clicks, rows):
-    # print(classify_clicks, reset_clicks, add_row, rows)
+def update(add_row, classify_clicks, rows):
+    # print(add_row, classify_clicks, rows)
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return None
 
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
 
-    # ctx = dash.callback_context
+    if button_id == 'add-row-btn': 
+        if add_row > 0:
+            rows.append({"Recommended Network Address": '0.0.0.0/24', "Recommended Network Hosts": '0.0.0.0', "Network Zone": ''})
+            return rows, ['']
 
-    # if not ctx.triggered:
-        # return rows
-
-    # button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-
-    # print(rows)
-
-    # if button_id == 'add-row-btn' and add_row > 0:
-    if n_clicks > 0:
-
-        # Append a blank row (or customize with default values)
-        # new_row = {
-            # "Recommended Network Address": "blank", 
-            # "Recommended Network Hosts": "blank" 
- 
-        # }
-        rows.append({"Recommended Network Address": '1', "Recommended Network Hosts": '1'})
-        
-        # Add the new blank row to the recommended rows
-        # rows.append(new_row)
-        # probed_rows, recommended_rows = 1
-        # data = data.to_dict('records')
-        # meh = ['']
-        # Initialize empty lists for the new dictionary
-        # network_addresses = []
-        # network_hosts = []
-
-        # Iterate over each entry in the original data
-        # for entry in data:
-            # Append the values to the respective lists
-            # network_addresses.append(entry['Recommended Network Address'])
-            # network_hosts.append(entry['Recommended Network Hosts'])
-
-        # Create the new dictionary with the lists
-        # formatted_data = {
-            # 'Recommended Network Address': network_addresses,
-            # 'Recommended Network Hosts': network_hosts
-        # }
-
-        # Now formatted_data contains the desired structure
-        # print(formatted_data)
-        # forma = [formatted_data]
-
-    return rows
-
-    # if button_id == 'classify-btn' and classify_clicks > 0:
-    #     # Extract hosts from Probed Networks table
-    #     hosts = []
-    #     for row in rows:
-    #         hosts_in_row = rows.get("Probed Network Hosts", "")
-    #         if hosts_in_row:
-    #             # Split by comma and strip spaces
-    #             hosts.extend([host.strip() for host in hosts_in_row.split(",") if host.strip()])
-
-    #     if not hosts:
-    #         return rows, "❌ No hosts found to classify."
-
-    #     # Perform classification
-    #     subnet_classification = classify_subnets(hosts)
-
-    #     # Update Probed Networks table (optional: could keep as is)
-    #     updated_probed_data = subnet_classification["Probed Networks"]
-
-    #     # Update Recommended Networks table
-    #     updated_recommended_data = subnet_classification["Recommended Networks"]
-
-    #     # Prepare output message
-    #     output_message = "✅ Networks classified successfully."
-
-    #     return (
-    #         updated_probed_data["Probed Network Address"],
-    #         updated_recommended_data["Recommended Network Address"],
-    #         output_message
-    #     )
-
-    # elif button_id == 'reset-btn' and reset_clicks > 0:
-    #     initial_probed_data = {
-    #         "Probed Network Address": [],
-    #         "Probed Network Hosts": [],
-    #         "Probed Network Zone": []
-    #     }
-
-    #     initial_recommended_data = {
-    #         "Recommended Network Address": [],
-    #         "Recommended Network Hosts": []
-    #     }
-
-    #     output_message = "🧹 Tables have been reset."
-
-    #     return (
-    #         initial_probed_data["Probed Network Address"],
-    #         initial_recommended_data["Recommended Network Address"],
-    #         output_message
-    #     )
-
-    # return rows, ""
+    elif button_id == 'classify-btn':
+        if classify_clicks > 0:
+            hosts = []
+            zones = []
+            for row in rows:
+                hosts_in_row = row['Recommended Network Address']
+                zones.append(row['Network Zone'])
+                if hosts_in_row:
+                    hosts.extend([host.strip() for host in hosts_in_row.split(",") if host.strip()])
+            vlan_config = generate_vlan_config(hosts, zones) 
+            
+            with open('vlan_config.txt', 'w') as file:
+                file.write(vlan_config)
+            print(vlan_config)
+            
+            return rows, vlan_config
+    return ""
 
 if __name__ == '__main__':
     # Auto-open web browser
