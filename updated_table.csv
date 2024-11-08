@@ -1,4 +1,7 @@
 Policy Number,Source Zone,Source Address,Dest Zone,Dest Address,Protocol,Port,Action
-P001,Internet,0.0.0.0/0,Internal,192.168.1.0/24,TCP,"80, 443",Permit
-P002,Serverfarm,192.168.2.0/24,Internal,192.168.1.0/24,UDP,53,Deny
-P003,Zone3,192.168.1.3,ZoneC,10.0.0.3,ICMP,0,Permit
+01,Internet,0.0.0.0/0,Serverfarm,192.168.100.0/24,TCP,"80,443",PERMIT
+02,Internet,0.0.0.0/0,Staff,192.168.1.0/24,UDP,53,DENY
+03,Staff,192.168.1.0/24,Internet,0.0.0.0/0,ICMP,0,PERMIT
+04,Staff,192.168.1.0/24,Serverfarm,192.168.100.0/24,ANY,ANY,DENY
+05,Serverfarm,192.168.100.0/24,Staff,192.168.1.0/24,ANY,ANY,DENY
+06,Serverfarm,192.168.100.0/24,Internet,0.0.0.0/0,ANY,ANY,DENY
