@@ -32,7 +32,7 @@ def show_ca_result():
 	with open('ca_temp.txt', 'r') as f:
 		reader = csv.reader(f)
 		data = [row for row in reader if row]
-	headers = ["IP", "State", "Ports"]
+	headers = ["IP", "Subnet", "State", "Ports"]
 	table = tabulate (data, headers, tablefmt="grid")
 	print(table)
 
@@ -109,13 +109,14 @@ def deep_scan(target_host):
 			if state == "open":
 				results.append(f"{port}({service})")
 	format_result = ";".join(results)
+	subnet = str(ipaddress.ip_network(target_host + '/24', strict=False))
 	with open('ca_temp.txt', 'a') as f:
-		f.write(f"{target_host},up,{format_result}\n")
+		f.write(f"{target_host},{subnet},up,{format_result}\n")
 	show_ca_result()
 
 def probe(target_subnet):
-	# trace_subnet = traceroute()   ## BYPASS 
-	trace_subnet = ['192.168.88.153/24']
+	#trace_subnet = traceroute()   ## BYPASS 
+	trace_subnet = ['192.168.200.1/24']
 	trace_subnet = trace_subnet + target_subnet
 	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	# print(result.stdout.decode('utf-8'))
@@ -134,6 +135,7 @@ def probe(target_subnet):
 		# print((probe_scan.stderr).decode('utf-8'))
 		last_probe_time = time.time()
 		processes = []
+		on_verify = []
 		probe_counter = 0
 		while True:
 			output = probe_scan.stdout.readline()
@@ -158,13 +160,15 @@ def probe(target_subnet):
 					host_exist = False
 					with open('ca_temp.txt', 'r') as f:
 						for line in f:
-							ip, _, _ = line.strip().split(',')
+							ip, _, _, _= line.strip().split(',')
 							if ip == regex_host_ip:
 								host_exist = True
-					if host_exist:
+					if host_exist or regex_host_ip in on_verify:
 						pass
 					else:
 						print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
+						on_verify.append(regex_host_ip)
+						print(on_verify, regex_host_ip)
 						host_state = multiprocessing.Process(target=verify, args=(regex_host_ip,))
 						host_state.start()
 						# print('process started')
@@ -231,13 +235,14 @@ def parsearg():
 	banner = "     e                 d8             ~~~~d88P ~~~888~~~ \n    d8b     888  888 _d88__  e88~-_      d88P     888    \n   /Y88b    888  888  888   d888   i    d88P      888    \n  /  Y88b   888  888  888   8888   |   d88P       888    \n /____Y88b  888  888  888   Y888   '  d88P        888    \n/      Y88b \"88_-888  \"88_/  \"88_-~  d88P____     888    \nAutomated Zero Trust Architecture by ReiKT. -h for help"
 	print(banner)
 	parser = argparse.ArgumentParser(description='Make sure masscan and nmap is installed and accessible from terminal/cmd')
-	parser.add_argument('--subnet', required=False, help='Scan specific subnet')
+	parser.add_argument('--subnet', required=False, help="Comma-separated list of target subnets (e.g., 192.168.0.0/24,10.0.1.0/24)")
 	parser.add_argument('--threads', required=False, type=int, help='Max threads used during scanning')
 	parser.add_argument('--int', required=False, help='Select NIC to perform scanning')
 
 	args = parser.parse_args()
 	if args.subnet:
-		probe(args.subnet)
+		subnets = args.subnet.split(",")
+		probe(subnets)
 		classify_subnets()
 	else:
 		probe(private_subnets)
