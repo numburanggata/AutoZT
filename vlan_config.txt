@@ -1,49 +1,15 @@
 vlan 10
  name VLAN_10
-!
 interface Vlan10
- ip address 192.168.3.0 255.255.255.248
+ ip address 192.168.200.0 255.255.252.0
  no shutdown
-!
 vlan 11
  name VLAN_11
-!
 interface Vlan11
- ip address 192.168.1.0 255.255.255.248
+ ip address 192.168.0.0 255.255.252.0
  no shutdown
-!
 vlan 12
  name VLAN_12
-!
 interface Vlan12
- ip address 192.168.1.8 255.255.255.248
- no shutdown
-!
-vlan 13
- name VLAN_13
-!
-interface Vlan13
- ip address 192.168.1.16 255.255.255.248
- no shutdown
-!
-vlan 14
- name VLAN_14
-!
-interface Vlan14
- ip address 192.168.3.8 255.255.255.248
- no shutdown
-!
-vlan 15
- name VLAN_15
-!
-interface Vlan15
  ip address 0.0.0.0 255.255.255.0
  no shutdown
-!
-vlan 16
- name VLAN_16
-!
-interface Vlan16
- ip address 0.0.0.0 255.255.255.0
- no shutdown
-!

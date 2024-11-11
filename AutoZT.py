@@ -9,6 +9,7 @@ import csv
 from tabulate import tabulate
 import ipaddress
 
+
 private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.1.1.0/24']
 
 # queue = multiprocessing.Queue()
@@ -242,11 +243,26 @@ def parsearg():
 	args = parser.parse_args()
 	if args.subnet:
 		subnets = args.subnet.split(",")
-		probe(subnets)
-		classify_subnets()
+		probe(subnets)	
 	else:
 		probe(private_subnets)
-		classify_subnets()
+		
+	#try:
+	#	import ip_classify_FAST
+	#	ip_classify_FAST.main()
+	#except:
+	#	print("Microsegmentation Finished")
+	try:
+	    subprocess.run(["python", "ip_classify_FAST.py"], check=True)
+	    print("IP classify ran successfully.")
+	except subprocess.CalledProcessError as e:
+	    print(f"IP classify failed with error: {e}")
+	
+	try:
+	    subprocess.run(["python", "design_zta.py"], check=True)
+	    print("Design ZTA ran successfully.")
+	except subprocess.CalledProcessError as e:
+	    print(f"Design ZTA failed with error: {e}")
 
 
 

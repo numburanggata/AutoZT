@@ -4,6 +4,7 @@ from dash import dash_table, dcc, html
 from dash.dependencies import Input, Output, State
 import pandas as pd
 import webbrowser
+import os
 
 
 def check_existing_ips(ipA, ipB):
@@ -27,11 +28,9 @@ def check_usable_host_ip(ip, subnet):
     # print(ip, network_address, broadcast_address)
     if str(ip) == str(network_address) or str(ip) == str(broadcast_address):
         # del subnets[subnet]
-        # print("FALSE GOBLOK")
         return False
     else:
         # print(ip, broadcast_address)
-        # print("TRUE GOBLOK")
         return True
 
 def classify_subnets(ip_list):
@@ -100,7 +99,7 @@ def classify_subnets(ip_list):
     # print(subnet_rank)
     sorted_subnet_rank = sorted(subnet_rank, key=lambda x: x[2], reverse=True)
 
-    print(sorted_subnet_rank)
+    #print(sorted_subnet_rank)
     for x in sorted_subnet_rank[0][1]:
         # print(x)
         # print(sorted_subnet_rank[0][0])
@@ -173,13 +172,13 @@ def generate_vlan_config(subnets, zones):
         # Create VLAN configuration
         config_lines.append(f"vlan {vlan_id}")
         config_lines.append(f" name {vlan_name}")
-        config_lines.append("!")
+        #config_lines.append("!")
 
         # Configure the VLAN interface
         config_lines.append(f"interface Vlan{vlan_id}")
         config_lines.append(f" ip address {network_address} {subnet_mask_to_cidr(subnet_mask)}")
         config_lines.append(" no shutdown")
-        config_lines.append("!")
+        #config_lines.append("!")
 
         vlan_id += 1
 
@@ -202,43 +201,43 @@ def subnet_mask_to_cidr(mask_bits):
 
 
 # Example usage:
-ip_list = [
+#ip_list = [
     # '192.168.1.10', 
     # '192.168.1.20', 
     # '192.168.2.30',
     # '192.168.1.15', 
     # '192.168.2.40',
-    '192.168.3.1',
-    '192.168.3.2',
-    '192.168.3.3',
-    '192.168.3.4',
-    '192.168.3.5',
-    '192.168.3.6',
-    '192.168.3.7',
-    '192.168.3.9',
-    '192.168.3.10',
-    '192.168.3.11',
-    '192.168.3.12',
-    '192.168.1.1',
-    '192.168.1.2',
-    '192.168.1.3',
-    '192.168.1.4',
-    '192.168.1.5',
-    '192.168.1.6',
-    '192.168.1.7',
-    '192.168.1.9',
-    '192.168.1.10',
-    '192.168.1.11',
-    '192.168.1.12',
-    '192.168.1.13',
-    '192.168.1.14',
-    '192.168.1.15',
-    '192.168.1.16',
-    '192.168.1.17',
-    '192.168.1.19',
-    '192.168.1.20',
-    '192.168.1.21',
-    '192.168.1.22',
+    #'192.168.3.1',
+    #'192.168.3.2',
+    #'192.168.3.3',
+    #'192.168.3.4',
+    #'192.168.3.5',
+    #'192.168.3.6',
+    #'192.168.3.7',
+    #'192.168.3.9',
+    #'192.168.3.10',
+    #'192.168.3.11',
+    #'192.168.3.12',
+    #'192.168.1.1',
+    #'192.168.1.2',
+    #'192.168.1.3',
+    #'192.168.1.4',
+    #'192.168.1.5',
+    #'192.168.1.6',
+    #'192.168.1.7',
+    #'192.168.1.9',
+    #'192.168.1.10',
+    #'192.168.1.11',
+    #'192.168.1.12',
+    #'192.168.1.13',
+    #'192.168.1.14',
+    #'192.168.1.15',
+    #'192.168.1.16',
+    #'192.168.1.17',
+    #'192.168.1.19',
+    #'192.168.1.20',
+    #'192.168.1.21',
+    #'192.168.1.22',
     # '192.168.3.221',
     # '192.168.3.223',
     # '192.168.3.225', 
@@ -246,7 +245,21 @@ ip_list = [
     # '10.0.1.1',
     # '172.16.0.1',
     # '10.10.100.121',
-    ]
+    #]
+
+# Initialize an empty list to store the first column values
+ip_list = []
+
+# Read the file and extract the first column from each row
+with open("ca_temp.txt", "r") as file:
+    for line in file:
+        # Strip leading/trailing whitespaces and newline characters, then split by commas
+        columns = line.strip().split(",")
+        # Append the first column (first element) to the list
+        ip_list.append(columns[0])
+
+# Print the list of first column values
+#print(first_column_list)
 
 classified_subnets = classify_subnets(ip_list)
 # for subnet, ips in classified_subnets.items():
@@ -479,6 +492,21 @@ app.layout = html.Div(style={
                         'cursor': 'pointer',
                         'fontSize': '16px'
                     }
+                ),
+                html.Button(
+                    'Exit',
+                    id='exit-btn',
+                    n_clicks=0,
+                    style={
+                        'backgroundColor': '#FF0000',
+                        'color': 'white',
+                        'padding': '10px 20px',
+                        'marginRight': '10px',
+                        'border': 'none',
+                        'borderRadius': '4px',
+                        'cursor': 'pointer',
+                        'fontSize': '16px'
+                    }
                 )
             ]
         ),
@@ -514,11 +542,11 @@ app.layout = html.Div(style={
 
 @app.callback(
     [Output('recommended-table', 'data'), Output('microseg-output', 'children')],
-    [Input('add-row-btn', 'n_clicks'),Input('classify-btn', 'n_clicks')],
+    [Input('add-row-btn', 'n_clicks'),Input('classify-btn', 'n_clicks'),Input('exit-btn', 'n_clicks')],
     State('recommended-table', 'data')
 )
 
-def update(add_row, classify_clicks, rows):
+def update(add_row, classify_clicks, exit_clicks, rows):
     # print(add_row, classify_clicks, rows)
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -530,6 +558,11 @@ def update(add_row, classify_clicks, rows):
         if add_row > 0:
             rows.append({"Recommended Network Address": '0.0.0.0/24', "Recommended Network Hosts": '0.0.0.0', "Network Zone": ''})
             return rows, ['']
+            
+    if button_id == 'exit-btn': 
+        if exit_clicks > 0:
+            os._exit(0)
+ 
 
     elif button_id == 'classify-btn':
         if classify_clicks > 0:
