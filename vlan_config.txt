@@ -1,15 +1,67 @@
+! Assign an interface as Trunk if needed
+interface Ethernetx/x
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+
+
 vlan 10
  name VLAN_10
 interface Vlan10
- ip address 192.168.200.0 255.255.252.0
  no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface Ethernetx/x
+ switchport mode access
+ switchport access vlan 10
+ no shutdown
+
+
 vlan 11
  name VLAN_11
 interface Vlan11
- ip address 192.168.0.0 255.255.252.0
  no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface Ethernetx/x
+ switchport mode access
+ switchport access vlan 11
+ no shutdown
+
+
 vlan 12
  name VLAN_12
 interface Vlan12
- ip address 0.0.0.0 255.255.255.0
  no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface Ethernetx/x
+ switchport mode access
+ switchport access vlan 12
+ no shutdown
+
+
+! Router Configuration
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.100.1 255.255.255.248
+ no shutdown
+
+ip dhcp pool VLAN_10
+ network 192.168.100.0 255.255.255.248
+ default-router 192.168.100.1
+
+interface GigabitEthernet0/0.11
+ encapsulation dot1Q 11
+ ip address 192.168.200.1 255.255.255.248
+ no shutdown
+
+ip dhcp pool VLAN_11
+ network 192.168.200.0 255.255.255.248
+ default-router 192.168.200.1
+
+interface GigabitEthernet0/0.12
+ encapsulation dot1Q 12
+ ip address 192.168.0.1 255.255.255.248
+ no shutdown
+
+ip dhcp pool VLAN_12
+ network 192.168.0.0 255.255.255.248
+ default-router 192.168.0.1

@@ -89,8 +89,9 @@ def verify(target_host):
 		#	"state": "down", 
 		#	"ports": None
 		#}
+		subnet = str(ipaddress.ip_network(target_host + '/24', strict=False))
 		with open('ca_temp.txt', 'a') as f:
-			f.write(f"{target_host},filtered,-\n")
+			f.write(f"{target_host},{subnet},filtered,-\n")
 		#found_host = {"ip": target_host, "state": "down", "ports": None}
 		#hosts.append(found_host)
 		print(target_host + " is likely DOWN")
@@ -161,6 +162,7 @@ def probe(target_subnet):
 					host_exist = False
 					with open('ca_temp.txt', 'r') as f:
 						for line in f:
+							#print(line)
 							ip, _, _, _= line.strip().split(',')
 							if ip == regex_host_ip:
 								host_exist = True
@@ -241,11 +243,11 @@ def parsearg():
 	parser.add_argument('--int', required=False, help='Select NIC to perform scanning')
 
 	args = parser.parse_args()
-	if args.subnet:
-		subnets = args.subnet.split(",")
-		probe(subnets)	
-	else:
-		probe(private_subnets)
+	#if args.subnet:
+	#	subnets = args.subnet.split(",")
+	#	probe(subnets)	
+	#else:
+	#	probe(private_subnets)
 		
 	#try:
 	#	import ip_classify_FAST

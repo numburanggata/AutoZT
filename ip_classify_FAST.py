@@ -5,6 +5,7 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import webbrowser
 import os
+import csv
 
 
 def check_existing_ips(ipA, ipB):
@@ -91,7 +92,7 @@ def classify_subnets(ip_list):
         available_host = ((32 - int(cidr)) ** 2) - 2 
         # print(0.85*(len(ips)/available_host))
         # print(0.15*((29-int(cidr))/7))
-        subnet_rank.append([subnet, ips, ( 0.70*(len(ips)/available_host) + 0.30*((29-int(cidr))/7) )])
+        subnet_rank.append([subnet, ips, ( 0.90*(len(ips)/available_host) + 0.10*((29-int(cidr))/7) )])
 
     #RUMUS BEST SUBNET => (used IP/possible IP) * 75% + flexibility_factor * 25% 
     # BEST SUBNET = Host Utilization (Aspek Modular, Security) + Address Utilization (Aspek Fleksibilitas, Kesederhanaan)
@@ -160,6 +161,13 @@ def generate_vlan_config(subnets, zones):
     config_lines = []
 
     vlan_id = 10  # Starting VLAN ID; adjust as needed
+
+    config_lines.append("! Assign an interface as Trunk if needed")
+    config_lines.append(f"interface Ethernetx/x")
+    config_lines.append(f" switchport trunk encapsulation dot1q")
+    config_lines.append(f" switchport mode trunk")
+    config_lines.append(" no shutdown")
+    config_lines.append("\n")
     for index, subnet in enumerate(subnets):
         # Calculate the network address and subnet mask
         subnet_info = subnet.split('/')
@@ -176,20 +184,70 @@ def generate_vlan_config(subnets, zones):
 
         # Configure the VLAN interface
         config_lines.append(f"interface Vlan{vlan_id}")
-        config_lines.append(f" ip address {network_address} {subnet_mask_to_cidr(subnet_mask)}")
+        #config_lines.append(f" ip address {network_address} {subnet_mask_to_cidr(subnet_mask)}")
         config_lines.append(" no shutdown")
-        #config_lines.append("!")
+        
+        
+        config_lines.append("! Assign the VLAN into associated ports/interfaces")
+        config_lines.append(f"interface Ethernetx/x")
+        config_lines.append(f" switchport mode access")
+        config_lines.append(f" switchport access vlan {vlan_id}")
+        config_lines.append(" no shutdown")
+        config_lines.append("\n")
 
         vlan_id += 1
+        
+    # Router Configuration
+    router_config_lines = ["! Router Configuration"]
+    vlan_id = 10  # Reset VLAN ID for consistency
+
+    for index, subnet in enumerate(subnets):
+        # Extract network address and prefix length
+        subnet_info = subnet.split('/')
+        network_address = subnet_info[0]
+        subnet_prefix = int(subnet_info[1])
+
+        # Define router IP for DHCP and inter-VLAN routing
+        router_ip = calculate_router_ip(network_address, subnet_prefix)
+
+        # Router subinterface configuration for each VLAN
+        router_config_lines.append(f"interface GigabitEthernet0/0.{vlan_id}")
+        router_config_lines.append(f" encapsulation dot1Q {vlan_id}")
+        router_config_lines.append(f" ip address {router_ip} {subnet_prefix_to_mask(subnet_prefix)}")
+        router_config_lines.append(" no shutdown")
+        router_config_lines.append("")
+
+        # DHCP Pool for each VLAN
+        router_config_lines.append(f"ip dhcp pool VLAN_{vlan_id}")
+        router_config_lines.append(f" network {network_address} {subnet_prefix_to_mask(subnet_prefix)}")
+        router_config_lines.append(f" default-router {router_ip}")
+        #router_config_lines.append(" dns-server 8.8.8.8 8.8.4.4")  # Optional: Set DNS servers
+        #router_config_lines.append(" lease 7")  # Set DHCP lease time in days, optional
+        router_config_lines.append("")
+
+        vlan_id += 1
+
+    # Combine switch and router configurations
+    config_lines.extend(router_config_lines)
 
     return "\n".join(config_lines)
 
 
+def subnet_prefix_to_mask(prefix):
+    # Helper function to convert subnet prefix length (e.g., /24) to subnet mask (e.g., 255.255.255.0)
+    mask = (0xffffffff >> (32 - prefix)) << (32 - prefix)
+    return f"{(mask >> 24) & 0xff}.{(mask >> 16) & 0xff}.{(mask >> 8) & 0xff}.{mask & 0xff}"
+    
 def subnet_mask_to_cidr(mask_bits):
     # Converts subnet mask bits into a CIDR format
     bits = (0xffffffff >> (32 - mask_bits)) << (32 - mask_bits)
     return f"{(bits >> 24) & 0xff}.{(bits >> 16) & 0xff}.{(bits >> 8) & 0xff}.{bits & 0xff}"
 
+def calculate_router_ip(network_address, prefix):
+    # Calculate the router IP as the first usable address in the subnet
+    ip_parts = list(map(int, network_address.split(".")))
+    ip_parts[-1] += 1  # Increment last octet for first usable address
+    return ".".join(map(str, ip_parts))
 
 
 
@@ -279,8 +337,10 @@ probed_subnets = {
 
 
 recommended_zones = [""] * len(items[3][1])
+internet_only = ["YES"] * len(items[3][1])
     
 items.append(['Network Zone', recommended_zones])
+items.append(['Internet Access', internet_only])
 
 recommended_subnets = dict(items[3:])
 
@@ -304,6 +364,10 @@ recommended_subnets = dict(items[3:])
 df_probed = pd.DataFrame(probed_subnets)
 df_recommended = pd.DataFrame(recommended_subnets)
 
+action_options = [
+    {"label": "YES", "value": "YES"},
+    {"label": "NO", "value": "NO"}
+]
 # Initialize Dash app
 app = dash.Dash(__name__)
 
@@ -407,12 +471,16 @@ app.layout = html.Div(style={
                     columns=[
                         {"name": "Recommended Network Address", "id": "Recommended Network Address", "deletable": False, "renamable": False},
                         {"name": "Recommended Network Hosts", "id": "Recommended Network Hosts", "deletable": False, "renamable": False},
-                        {"name": "Network Zone", "id": "Network Zone", "deletable": False, "renamable": False}
+                        {"name": "Network Zone", "id": "Network Zone", "deletable": False, "renamable": False},
+                        {"name": "Internet Access Only?", "id": "Internet Access", "deletable": False, "renamable": False, "presentation": "dropdown"}
                     ],
                     data=df_recommended.to_dict('records'),
                     editable=True,  # Recommended networks are output only
                     row_deletable=True,
                     page_size=10,
+                    dropdown={
+                    'Internet Access': { 'options': action_options}
+                    },
                     style_table={
                         'overflowX': 'auto'
                     },
@@ -456,6 +524,18 @@ app.layout = html.Div(style={
                             'rule': 'line-height: 15px;'
                         }
                     ]
+                   
+		    # Add a dropdown to the new "Internet Access" column
+		    #editable=True,
+		    #cell_editable=True,
+		    #cell_selectable=True,
+		    #dropdown_conditional={
+			#'if': {'column_id': 'Internet Access'},
+			#'options': [
+			 #   {'label': 'Yes', 'value': 'Yes'},
+			  #  {'label': 'No', 'value': 'No'}
+			#]
+		   # }
                 ),
             ]
         ),
@@ -568,13 +648,22 @@ def update(add_row, classify_clicks, exit_clicks, rows):
         if classify_clicks > 0:
             hosts = []
             zones = []
+            internet_access = []
             for row in rows:
+                #print(row)
                 hosts_in_row = row['Recommended Network Address']
                 zones.append(row['Network Zone'])
+                internet_access.append(row['Internet Access'])
                 if hosts_in_row:
                     hosts.extend([host.strip() for host in hosts_in_row.split(",") if host.strip()])
             vlan_config = generate_vlan_config(hosts, zones) 
             
+            with open("recommended_subnets", mode='w', newline='') as file:
+                writer = csv.writer(file)
+                csv_rows = zip(hosts, zones, internet_access)
+                writer.writerow(["Recommended Network Address", "Network Zone", "Internet Access"])
+                writer.writerows(csv_rows)
+                
             with open('vlan_config.txt', 'w') as file:
                 file.write(vlan_config)
             print(vlan_config)
