@@ -47,7 +47,7 @@ protocol_options = [
     {"label": "TCP", "value": "TCP"},
     {"label": "UDP", "value": "UDP"},
     {"label": "ICMP", "value": "ICMP"},
-    {"label": "ANY", "value": "ANY"}
+    {"label": "IP", "value": "IP"}
 ]
 
 action_options = [
@@ -79,41 +79,62 @@ recommended_policy = {
 }
 policy_number = 1
 for subnet_src, zones_src, inet_src in zip(recommended_networks, network_zones, internet_only):
+        inet_policy = 0
         for subnet_dest, zones_dest, inet_dest in zip(recommended_networks, network_zones, internet_only):
-            print(zones_src, zones_dest)
+            
+            #print(zones_src, zones_dest)
             if subnet_src == subnet_dest:
-                print('Same Subnet')
+                #print('Same Subnet')
                 continue
-            if inet_src == 'YES':
-                print(subnet_src, zones_src, inet_src, subnet_dest, zones_dest, inet_dest)
+            if inet_src == 'inet_only':
+                #if inet_policy >= 1:
+                   #continue
+                #print(subnet_src, zones_src, inet_src, subnet_dest, zones_dest, inet_dest)
                 recommended_policy["Policy Number"].append(f"{policy_number:02d}")
                 recommended_policy["Source Zone"].append(zones_src)
                 recommended_policy["Source Address"].append(subnet_src)
                 recommended_policy["Dest Zone"].append("Internet")
                 recommended_policy["Dest Address"].append("0.0.0.0/0")  # Destination for internet
-                recommended_policy["Protocol"].append("ANY")  # Default protocol
+                recommended_policy["Protocol"].append("IP")  # Default protocol
                 recommended_policy["Port"].append("ANY")      # Default port
                 recommended_policy["Action"].append("PERMIT") # Action for allowed access
-
                 policy_number += 1
                 break
                 
+            #if inet_src == 'inet_no':
                 
-            elif inet_src == 'NO':
+            ports = get_ports_for_ip(subnet_dest[:-3], "ca_temp.txt")
+                #print("Ports for the IP address:", subnet_dest[:-3], ports) 
+            port_string = ', '.join(ports)
+            recommended_policy["Policy Number"].append(f"{policy_number:02d}")
+            recommended_policy["Source Zone"].append(zones_src)
+            recommended_policy["Source Address"].append(subnet_src)
+            recommended_policy["Dest Zone"].append(zones_dest)
+            recommended_policy["Dest Address"].append(subnet_dest)  # Destination for internet
+            recommended_policy["Protocol"].append("IP")  # Default protocol
+            recommended_policy["Port"].append(port_string)      # Default port
+            recommended_policy["Action"].append("PERMIT") # Action for allowed access
                 
-                ports = get_ports_for_ip(subnet_dest[:-3], "ca_temp.txt")
-                print("Ports for the IP address:", subnet_dest[:-3], ports) 
-                port_string = ', '.join(ports)
+            policy_number += 1
+            inet_policy += 1
+            print(inet_policy, len(network_zones))
+
+            if inet_src == 'inet_access' and inet_policy + 1 >= len(network_zones):
+                #if inet_policy >= 1:
+                   #continue
+                #print(subnet_src, zones_src, inet_src, subnet_dest, zones_dest, inet_dest)
                 recommended_policy["Policy Number"].append(f"{policy_number:02d}")
                 recommended_policy["Source Zone"].append(zones_src)
                 recommended_policy["Source Address"].append(subnet_src)
-                recommended_policy["Dest Zone"].append(zones_dest)
-                recommended_policy["Dest Address"].append(subnet_dest)  # Destination for internet
-                recommended_policy["Protocol"].append("TCP")  # Default protocol
-                recommended_policy["Port"].append(port_string)      # Default port
+                recommended_policy["Dest Zone"].append("Internet")
+                recommended_policy["Dest Address"].append("0.0.0.0/0")  # Destination for internet
+                recommended_policy["Protocol"].append("IP")  # Default protocol
+                recommended_policy["Port"].append("ANY")      # Default port
                 recommended_policy["Action"].append("PERMIT") # Action for allowed access
-                
                 policy_number += 1
+                
+                
+
 print(recommended_policy)            
 
 df = pd.DataFrame(recommended_policy)
@@ -310,40 +331,90 @@ def handle_buttons(save_clicks, export_clicks, rows):
             return acl_commands
     
     return ""
+def netmask_to_wildcard(netmask):
+    # Split the netmask into a list of integers
+    netmask_parts = netmask.split('.')
+    
+    # Convert each part into an integer
+    netmask_parts = [int(part) for part in netmask_parts]
+    
+    # Subtract each part of the netmask from 255 to get the wildcard mask
+    wildcard_parts = [255 - part for part in netmask_parts]
+    
+    # Join the wildcard parts into a string and return it
+    return '.'.join(map(str, wildcard_parts))
 
 def export_to_cisco_acl(rows):
     """Convert each row to Cisco ACL syntax and save to a file."""
     acl_commands = []
-    seq_number = 100  # Start sequence number
+    #seq_number = 100  # Start sequence number
 
+    # Group rows by Source Zone
+    zones = {}
     for row in rows:
-        action = row["Action"].lower()  # Convert to lowercase for Cisco syntax
-        protocol = row["Protocol"].lower()
-        src_address = row["Source Address"]
+        src_zone = row['Source Zone']
+        if src_zone not in zones:
+            zones[src_zone] = []
+        zones[src_zone].append(row)
+
+    # Generate ACL commands for each zone
+    # Generate ACL commands for each zone
+    for zone, zone_rows in zones.items():
+        seq_number = 100
+        acl_commands.append(f"ip access-list extended VLAN-{zone}")
         
-        src_network = ipaddress.IPv4Network(src_address, strict=False)
-        src_network_address = str(src_network.network_address)
-        src_subnet_mask = str(src_network.netmask)
-        
-        dst_address = row["Dest Address"]
+        for row in zone_rows:
+            action = row["Action"].lower()  # Convert to lowercase for Cisco syntax
+            protocol = row["Protocol"].lower()
+            #protocol = row["inet"].lower()
+            src_address = row["Source Address"]
+            src_network = ipaddress.IPv4Network(src_address, strict=False)
+            src_network_address = str(src_network.network_address)
+            src_subnet_mask = str(src_network.netmask)
+            
+            dst_address = row["Dest Address"]
+            dst_network = ipaddress.IPv4Network(dst_address, strict=False)
+            dst_network_address = str(dst_network.network_address)
+            dst_subnet_mask = str(dst_network.netmask)
 
-        dst_network = ipaddress.IPv4Network(dst_address, strict=False)
-        dst_network_address = str(dst_network.network_address)
-        dst_subnet_mask = str(dst_network.netmask)
-
-        port = row["Port"]
-        
-        # Construct the ACL command in extended IP access-list format
-        if port != 0 and port != "ANY":  # If there's a port number, include it in the ACL command
-            acl_command = f"{seq_number} {action} {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask} eq {port}"
-        elif port == "ANY":
-            acl_command = f"{seq_number} ip {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask}"
-        else:
-            acl_command = f"{seq_number} ip {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask}"
-
-        acl_commands.append(acl_command)
-        seq_number += 2  # Increment sequence number by 5
-
+            ports = row["Port"]
+            if ports != "ANY":
+                # If ports are specified, convert them into a comma-separated string
+                ports_all = list(set(ports.split(', ')))
+                ports_all.sort()
+            
+            if dst_address != "0.0.0.0/0":
+                print(dst_address)
+                # Handle other destination addresses (including private subnets)
+                if ports != "ANY":
+                    ports_all = list(set(ports.split(', ')))
+                    ports_all.sort()
+                    for p in ports_all:
+                        acl_command = f"{seq_number} {action} {protocol} {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)} eq {p}"
+                    #acl_command = f"{seq_number} {action} {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask} eq {ports}"
+                        acl_commands.append(acl_command)
+                        seq_number += 2  # Increment sequence number by 2 for each rule
+                else:
+                    acl_command = f"{seq_number} {action} {protocol} {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}"
+                    acl_commands.append(acl_command)
+                    seq_number += 2  # Increment sequence number by 2 for each rule
+            # If the destination is "Internet", deny access to private subnets and allow all traffic to the internet
+            else:
+               #print(sum(element.count(src_zone) for element in recommended_policy["Source Zone"]))
+                if sum(element.count(src_zone) for element in recommended_policy["Source Zone"]) > 1:
+                   #print(sum(element.count(src_zone) for element in row['Source Zone']))
+                    #Deny private network access
+                    acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
+                    acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
+                    acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
+                acl_commands.append(f"{seq_number+3} permit ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}")
+                seq_number += 4  # Increment sequence by 4 for these rules
+                        
+        # Add the ACL application to the relevant interface
+        acl_commands.append(f"interface Ethernetx/x")
+        acl_commands.append(f"ip access-group VLAN-{zone} in")
+        acl_commands.append("")  # Add an empty line for clarity between different ACLs
+    
     # Save ACL commands to a file
     with open('cisco_acl.txt', 'w') as file:
         for command in acl_commands:

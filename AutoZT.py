@@ -243,11 +243,11 @@ def parsearg():
 	parser.add_argument('--int', required=False, help='Select NIC to perform scanning')
 
 	args = parser.parse_args()
-	#if args.subnet:
-	#	subnets = args.subnet.split(",")
-	#	probe(subnets)	
-	#else:
-	#	probe(private_subnets)
+	if args.subnet:
+		subnets = args.subnet.split(",")
+		probe(subnets)	
+	else:
+		probe(private_subnets)
 		
 	#try:
 	#	import ip_classify_FAST

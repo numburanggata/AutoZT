@@ -166,6 +166,7 @@ def generate_vlan_config(subnets, zones):
     config_lines.append(f"interface Ethernetx/x")
     config_lines.append(f" switchport trunk encapsulation dot1q")
     config_lines.append(f" switchport mode trunk")
+    config_lines.append(f" switchport trunk allowed vlan xx,xx")
     config_lines.append(" no shutdown")
     config_lines.append("\n")
     for index, subnet in enumerate(subnets):
@@ -337,7 +338,7 @@ probed_subnets = {
 
 
 recommended_zones = [""] * len(items[3][1])
-internet_only = ["YES"] * len(items[3][1])
+internet_only = ["inet_access"] * len(items[3][1])
     
 items.append(['Network Zone', recommended_zones])
 items.append(['Internet Access', internet_only])
@@ -365,8 +366,9 @@ df_probed = pd.DataFrame(probed_subnets)
 df_recommended = pd.DataFrame(recommended_subnets)
 
 action_options = [
-    {"label": "YES", "value": "YES"},
-    {"label": "NO", "value": "NO"}
+    {"label": "Internet Only", "value": "inet_only"},
+    {"label": "Internet Access", "value": "inet_access"},
+    {"label": "No Internet", "value": "inet_no"}
 ]
 # Initialize Dash app
 app = dash.Dash(__name__)
