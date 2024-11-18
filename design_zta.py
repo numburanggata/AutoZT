@@ -5,6 +5,32 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import webbrowser
 import ipaddress
+import csv
+
+def get_ports_for_ip(ip_address, csv_file_path):
+
+    ports = set()  # To store unique port numbers
+    ip_obj = ipaddress.ip_address(ip_address)  # Convert the given IP to an IP object for comparison
+
+    # Open the CSV file and read its content
+    with open(csv_file_path, mode='r') as file:
+        for line in file:
+            host, subnet, status, port_data = line.strip().split(',')
+            subnet_obj = ipaddress.ip_network(subnet, strict=False)  # Convert subnet to an IP network object
+            
+            # Check if the IP address is within this subnet
+            if ip_obj in subnet_obj:
+                # Extract ports from the port_data field
+                if port_data and port_data != '-':
+                    for entry in port_data.split(';'):
+                        port = entry.split('(')[0].strip()  # Extract port number (before parentheses)
+                        if port.isdigit():  # Check if it's a valid port number
+                            ports.add(port)
+
+    return sorted(ports)
+
+
+
 
 data = {
     "Policy Number": ["01", "02", "03", "04", "05", "06"],
@@ -29,7 +55,68 @@ action_options = [
     {"label": "DENY", "value": "DENY"}
 ]
 
-df = pd.DataFrame(data)
+
+recommended_networks = []
+network_zones = []
+internet_only = []
+
+with open('recommended_subnets.csv', mode='r') as file:
+    reader = csv.DictReader(file)
+    for row in reader:
+        recommended_networks.append(row['Recommended Network Address'])
+        network_zones.append(row['Network Zone'])
+        internet_only.append(row['Internet Access'])
+
+recommended_policy = {
+    "Policy Number": [],
+    "Source Zone": [],
+    "Source Address": [],
+    "Dest Zone": [],
+    "Dest Address": [],
+    "Protocol": [],
+    "Port": [],
+    "Action": []
+}
+policy_number = 1
+for subnet_src, zones_src, inet_src in zip(recommended_networks, network_zones, internet_only):
+        for subnet_dest, zones_dest, inet_dest in zip(recommended_networks, network_zones, internet_only):
+            print(zones_src, zones_dest)
+            if subnet_src == subnet_dest:
+                print('Same Subnet')
+                continue
+            if inet_src == 'YES':
+                print(subnet_src, zones_src, inet_src, subnet_dest, zones_dest, inet_dest)
+                recommended_policy["Policy Number"].append(f"{policy_number:02d}")
+                recommended_policy["Source Zone"].append(zones_src)
+                recommended_policy["Source Address"].append(subnet_src)
+                recommended_policy["Dest Zone"].append("Internet")
+                recommended_policy["Dest Address"].append("0.0.0.0/0")  # Destination for internet
+                recommended_policy["Protocol"].append("ANY")  # Default protocol
+                recommended_policy["Port"].append("ANY")      # Default port
+                recommended_policy["Action"].append("PERMIT") # Action for allowed access
+
+                policy_number += 1
+                break
+                
+                
+            elif inet_src == 'NO':
+                
+                ports = get_ports_for_ip(subnet_dest[:-3], "ca_temp.txt")
+                print("Ports for the IP address:", subnet_dest[:-3], ports) 
+                port_string = ', '.join(ports)
+                recommended_policy["Policy Number"].append(f"{policy_number:02d}")
+                recommended_policy["Source Zone"].append(zones_src)
+                recommended_policy["Source Address"].append(subnet_src)
+                recommended_policy["Dest Zone"].append(zones_dest)
+                recommended_policy["Dest Address"].append(subnet_dest)  # Destination for internet
+                recommended_policy["Protocol"].append("TCP")  # Default protocol
+                recommended_policy["Port"].append(port_string)      # Default port
+                recommended_policy["Action"].append("PERMIT") # Action for allowed access
+                
+                policy_number += 1
+print(recommended_policy)            
+
+df = pd.DataFrame(recommended_policy)
 
 app = dash.Dash(__name__)
 

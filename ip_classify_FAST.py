@@ -658,7 +658,7 @@ def update(add_row, classify_clicks, exit_clicks, rows):
                     hosts.extend([host.strip() for host in hosts_in_row.split(",") if host.strip()])
             vlan_config = generate_vlan_config(hosts, zones) 
             
-            with open("recommended_subnets", mode='w', newline='') as file:
+            with open("recommended_subnets.csv", mode='w', newline='') as file:
                 writer = csv.writer(file)
                 csv_rows = zip(hosts, zones, internet_access)
                 writer.writerow(["Recommended Network Address", "Network Zone", "Internet Access"])
