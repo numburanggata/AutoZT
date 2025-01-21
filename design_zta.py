@@ -366,7 +366,6 @@ def export_to_cisco_acl(rows):
         for row in zone_rows:
             action = row["Action"].lower()  # Convert to lowercase for Cisco syntax
             protocol = row["Protocol"].lower()
-            #protocol = row["inet"].lower()
             src_address = row["Source Address"]
             src_network = ipaddress.IPv4Network(src_address, strict=False)
             src_network_address = str(src_network.network_address)
@@ -382,9 +381,10 @@ def export_to_cisco_acl(rows):
                 # If ports are specified, convert them into a comma-separated string
                 ports_all = list(set(ports.split(', ')))
                 ports_all.sort()
+                protocol = "tcp"
             
             if dst_address != "0.0.0.0/0":
-                print(dst_address)
+                #print(dst_address)
                 # Handle other destination addresses (including private subnets)
                 if ports != "ANY":
                     ports_all = list(set(ports.split(', ')))

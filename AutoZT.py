@@ -10,7 +10,7 @@ from tabulate import tabulate
 import ipaddress
 
 
-private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.1.1.0/24']
+private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
 
 # queue = multiprocessing.Queue()
 # with multiprocessing.Manager() as manager:
@@ -184,13 +184,32 @@ def probe(target_subnet):
 					pass
 			
 			if probe_scan.poll() is not None:
-				print("PROBE SUBNET BERIKUTNYA...")
+				print("COMPLEMENTING SCANS...")
+				nm = nmap.PortScanner()
+				nm.scan(hosts=trace, arguments='-T4')
+				for host in nm.all_hosts():
+					try:
+						pulse = nm[host]['tcp']
+						pass
+					except KeyError:
+						host_exist = False
+						with open('ca_temp.txt', 'r') as f:
+							for line in f:
+								ip, _, _, _= line.strip().split(',')
+								if ip == host:
+									host_exist = True
+						if host_exist == False:
+							print(host + " is UP WITHOUT OPEN PORT")
+							subnet = str(ipaddress.ip_network(host + '/24', strict=False))
+							with open('ca_temp.txt', 'a') as f:
+								f.write(f"{host},{subnet},up,\n")
+				print("PROBING NEXT SUBNET, FINISHING CURRENT PROCESS")
 				#show_ca_result()
 				break
 		for p in processes:
 				p.join()
 
-	print("PROBE SUBNET SELESAI")
+	print("SUBNET PROBE FINISHED")
 
 def classify_subnets():
 	subnets = {}

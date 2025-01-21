@@ -92,7 +92,7 @@ def classify_subnets(ip_list):
         available_host = ((32 - int(cidr)) ** 2) - 2 
         # print(0.85*(len(ips)/available_host))
         # print(0.15*((29-int(cidr))/7))
-        subnet_rank.append([subnet, ips, ( 0.90*(len(ips)/available_host) + 0.10*((29-int(cidr))/7) )])
+        subnet_rank.append([subnet, ips, ( 0.80*(len(ips)/available_host) + 0.20*((29-int(cidr))/7) )])
 
     #RUMUS BEST SUBNET => (used IP/possible IP) * 75% + flexibility_factor * 25% 
     # BEST SUBNET = Host Utilization (Aspek Modular, Security) + Address Utilization (Aspek Fleksibilitas, Kesederhanaan)
