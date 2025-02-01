@@ -190,9 +190,10 @@ def generate_vlan_config(subnets, zones):
         
         
         config_lines.append("! Assign the VLAN into associated ports/interfaces")
-        config_lines.append(f"interface Ethernetx/x")
+        config_lines.append(f"interface range Ethernetx/x-x")
         config_lines.append(f" switchport mode access")
         config_lines.append(f" switchport access vlan {vlan_id}")
+        config_lines.append(f" description {vlan_name}")
         config_lines.append(" no shutdown")
         config_lines.append("\n")
 
@@ -208,12 +209,15 @@ def generate_vlan_config(subnets, zones):
         network_address = subnet_info[0]
         subnet_prefix = int(subnet_info[1])
 
+        vlan_name = zones[index] if index < len(zones) and zones[index] else f"VLAN_{vlan_id}"
+
         # Define router IP for DHCP and inter-VLAN routing
         router_ip = calculate_router_ip(network_address, subnet_prefix)
 
         # Router subinterface configuration for each VLAN
-        router_config_lines.append(f"interface GigabitEthernet0/0.{vlan_id}")
+        router_config_lines.append(f"interface FastEthernet0/0.{vlan_id}")
         router_config_lines.append(f" encapsulation dot1Q {vlan_id}")
+        router_config_lines.append(f" description {vlan_name}")
         router_config_lines.append(f" ip address {router_ip} {subnet_prefix_to_mask(subnet_prefix)}")
         router_config_lines.append(" no shutdown")
         router_config_lines.append("")
@@ -221,6 +225,7 @@ def generate_vlan_config(subnets, zones):
         # DHCP Pool for each VLAN
         router_config_lines.append(f"ip dhcp pool VLAN_{vlan_id}")
         router_config_lines.append(f" network {network_address} {subnet_prefix_to_mask(subnet_prefix)}")
+        router_config_lines.append(f" description {vlan_name}")
         router_config_lines.append(f" default-router {router_ip}")
         #router_config_lines.append(" dns-server 8.8.8.8 8.8.4.4")  # Optional: Set DNS servers
         #router_config_lines.append(" lease 7")  # Set DHCP lease time in days, optional
