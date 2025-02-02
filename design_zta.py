@@ -429,11 +429,14 @@ def export_to_cisco_acl(rows):
             else:
                 pass
 
-        #Explicit deny private network access
-        acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
-        acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
-        acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
-        seq_number += 3 
+        #Explicit deny private network access, except essentials (DHCP and DNS)
+        acl_commands.append(f"{seq_number} permit tcp 0.0.0.0 255.255.255.255 0.0.0.0 255.255.255.255 eq 53")
+        acl_commands.append(f"{seq_number+1} permit udp 0.0.0.0 255.255.255.255 0.0.0.0 255.255.255.255 eq 53")
+        acl_commands.append(f"{seq_number+2} permit udp 0.0.0.0 255.255.255.255 0.0.0.0 255.255.255.255 range 67 68")
+        acl_commands.append(f"{seq_number+3} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
+        acl_commands.append(f"{seq_number+4} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
+        acl_commands.append(f"{seq_number+5} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
+        seq_number += 6 
 
         # If the destination is "Internet", deny access to private subnets and allow all traffic to the internet
         if give_internet == 1:
@@ -444,7 +447,7 @@ def export_to_cisco_acl(rows):
             #    acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
             #    acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
             #    acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
-            acl_commands.append(f"{seq_number} permit ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}")
+            acl_commands.append(f"{seq_number} permit ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 0.0.0.0 255.255.255.255")
             seq_number += 1  # Increment sequence by 4 for these rules
                         
         # Add the ACL application to the relevant interface
