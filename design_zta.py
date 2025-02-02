@@ -358,20 +358,33 @@ def export_to_cisco_acl(rows):
         zones[src_zone].append(row)
 
     # Generate ACL commands for each zone
-    # Generate ACL commands for each zone
     for zone, zone_rows in zones.items():
         seq_number = 100
+        give_internet = 0
+
+        print(zone, zone_rows)
         acl_commands.append(f"ip access-list extended VLAN-{zone}")
-        
-        #print(sum(element.count(src_zone) for element in row['Source Zone']))
-        #Explicit deny private network access
+
         src_address = zone_rows[0]["Source Address"]
         src_network = ipaddress.IPv4Network(src_address, strict=False)
         src_network_address = str(src_network.network_address)
         src_subnet_mask = str(src_network.netmask)
-        acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
-        acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
-        acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
+
+        for row in rows:
+            dest_zone = row['Dest Zone']
+            if zone == dest_zone:
+                src_reply = row['Source Address']
+                src_reply_network = ipaddress.IPv4Network(src_reply, strict=False)
+                src_reply_network_address = str(src_reply_network.network_address)
+                src_reply_subnet_mask = str(src_reply_network.netmask)
+                acl_commands.append(f"{seq_number} permit ip {src_reply_network_address} {netmask_to_wildcard(src_reply_subnet_mask)} {src_network_address} {netmask_to_wildcard(src_subnet_mask)}")
+                seq_number += 1  
+            
+        #print(sum(element.count(src_zone) for element in row['Source Zone']))
+        #Explicit deny private network access
+        #acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
+        #acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
+        #acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
 
           
         for row in zone_rows:
@@ -404,22 +417,35 @@ def export_to_cisco_acl(rows):
                         acl_command = f"{seq_number} {action} {protocol} {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)} eq {p}"
                     #acl_command = f"{seq_number} {action} {protocol} {src_network_address} {src_subnet_mask} {dst_network_address} {dst_subnet_mask} eq {ports}"
                         acl_commands.append(acl_command)
-                        seq_number += 2  # Increment sequence number by 2 for each rule
+                        seq_number += 1  # Increment sequence number by 2 for each rule
                 else:
                     acl_command = f"{seq_number} {action} {protocol} {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}"
                     acl_commands.append(acl_command)
-                    seq_number += 2  # Increment sequence number by 2 for each rule
-            # If the destination is "Internet", deny access to private subnets and allow all traffic to the internet
+                    seq_number += 1  # Increment sequence number by 2 for each rule
+            
+            elif dst_address == "0.0.0.0/0" and action == 'permit':
+                give_internet = 1
+            
             else:
-               #print(sum(element.count(src_zone) for element in recommended_policy["Source Zone"]))
-                #if sum(element.count(src_zone) for element in recommended_policy["Source Zone"]) > 1:
-                   #print(sum(element.count(src_zone) for element in row['Source Zone']))
-                    #Deny private network access
-                #    acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
-                #    acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
-                #    acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
-                acl_commands.append(f"{seq_number+3} permit ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}")
-                seq_number += 4  # Increment sequence by 4 for these rules
+                pass
+
+        #Explicit deny private network access
+        acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
+        acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
+        acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
+        seq_number += 3 
+
+        # If the destination is "Internet", deny access to private subnets and allow all traffic to the internet
+        if give_internet == 1:
+           #print(sum(element.count(src_zone) for element in recommended_policy["Source Zone"]))
+            #if sum(element.count(src_zone) for element in recommended_policy["Source Zone"]) > 1:
+               #print(sum(element.count(src_zone) for element in row['Source Zone']))
+                #Deny private network access
+            #    acl_commands.append(f"{seq_number} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 10.0.0.0 0.255.255.255")
+            #    acl_commands.append(f"{seq_number+1} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 172.16.0.0 0.15.255.255")
+            #    acl_commands.append(f"{seq_number+2} deny ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} 192.168.0.0 0.0.255.255")
+            acl_commands.append(f"{seq_number} permit ip {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {dst_network_address} {netmask_to_wildcard(dst_subnet_mask)}")
+            seq_number += 1  # Increment sequence by 4 for these rules
                         
         # Add the ACL application to the relevant interface
         acl_commands.append(f"interface FastEthernetx/x")

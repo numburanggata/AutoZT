@@ -7,22 +7,94 @@ interface Ethernetx/x
 
 
 vlan 10
- name VLAN_10
+ name Offce
 interface Vlan10
  no shutdown
 ! Assign the VLAN into associated ports/interfaces
-interface Ethernetx/x
+interface range Ethernetx/x-x
  switchport mode access
  switchport access vlan 10
+ description Offce
+ no shutdown
+
+
+vlan 11
+ name Public
+interface Vlan11
+ no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface range Ethernetx/x-x
+ switchport mode access
+ switchport access vlan 11
+ description Public
+ no shutdown
+
+
+vlan 12
+ name NetAdmiunn
+interface Vlan12
+ no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface range Ethernetx/x-x
+ switchport mode access
+ switchport access vlan 12
+ description NetAdmiunn
+ no shutdown
+
+
+vlan 13
+ name Nona
+interface Vlan13
+ no shutdown
+! Assign the VLAN into associated ports/interfaces
+interface range Ethernetx/x-x
+ switchport mode access
+ switchport access vlan 13
+ description Nona
  no shutdown
 
 
 ! Router Configuration
 interface GigabitEthernet0/0.10
  encapsulation dot1Q 10
- ip address 192.168.200.1 255.255.255.248
+ description Offce
+ ip address 192.168.0.1 255.255.255.248
  no shutdown
 
 ip dhcp pool VLAN_10
+ network 192.168.0.0 255.255.255.248
+ description Offce
+ default-router 192.168.0.1
+
+interface GigabitEthernet0/0.11
+ encapsulation dot1Q 11
+ description Public
+ ip address 192.168.100.1 255.255.255.248
+ no shutdown
+
+ip dhcp pool VLAN_11
+ network 192.168.100.0 255.255.255.248
+ description Public
+ default-router 192.168.100.1
+
+interface GigabitEthernet0/0.12
+ encapsulation dot1Q 12
+ description NetAdmiunn
+ ip address 192.168.200.1 255.255.255.248
+ no shutdown
+
+ip dhcp pool VLAN_12
  network 192.168.200.0 255.255.255.248
+ description NetAdmiunn
  default-router 192.168.200.1
+
+interface GigabitEthernet0/0.13
+ encapsulation dot1Q 13
+ description Nona
+ ip address 10.0.0.1 255.255.255.0
+ no shutdown
+
+ip dhcp pool VLAN_13
+ network 10.0.0.0 255.255.255.0
+ description Nona
+ default-router 10.0.0.1
