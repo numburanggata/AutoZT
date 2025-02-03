@@ -377,7 +377,7 @@ def export_to_cisco_acl(rows):
                 src_reply_network = ipaddress.IPv4Network(src_reply, strict=False)
                 src_reply_network_address = str(src_reply_network.network_address)
                 src_reply_subnet_mask = str(src_reply_network.netmask)
-                acl_commands.append(f"{seq_number} permit ip {src_reply_network_address} {netmask_to_wildcard(src_reply_subnet_mask)} {src_network_address} {netmask_to_wildcard(src_subnet_mask)}")
+                acl_commands.append(f"{seq_number} permit tcp {src_network_address} {netmask_to_wildcard(src_subnet_mask)} {src_reply_network_address} {netmask_to_wildcard(src_reply_subnet_mask)} established")
                 seq_number += 1  
             
         #print(sum(element.count(src_zone) for element in row['Source Zone']))
