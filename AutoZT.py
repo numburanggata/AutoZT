@@ -8,6 +8,7 @@ import time
 import csv
 from tabulate import tabulate
 import ipaddress
+from threading import Event
 
 
 private_subnets = ['192.168.0.0/16', '172.16.0.0/12', '10.0.0.0/8']
@@ -62,7 +63,7 @@ def traceroute(): #AKAN DIBUAT PARALEL DGN MULTITHREADING
 				trace_subnet.append(regex_ip+'/24')
 			else:
 				pass
-	print(trace_subnet)
+	#print(trace_subnet)
 	return trace_subnet
 
 def verify(target_host):
@@ -101,8 +102,9 @@ def verify(target_host):
 
 def deep_scan(target_host):
 	nm = nmap.PortScanner()
-	nm.scan(hosts=target_host, arguments='-T4 -p- --open')
+	nm.scan(hosts=target_host, arguments='-T4 --open')
 	results = []
+	Event().wait(1.0)
 	for protocol in nm[target_host].all_protocols():
 		ports = nm[target_host][protocol].keys()
 		for port in sorted(ports):
@@ -118,12 +120,12 @@ def deep_scan(target_host):
 
 def probe(target_subnet):
 	#trace_subnet = traceroute()   ## BYPASS 
-	trace_subnet = ['192.168.200.1/24']
-	trace_subnet = trace_subnet + target_subnet
+	trace_subnet = ['10.10.20.0/24']
+	trace_subnet = trace_subnet[:-1] + target_subnet
 	# result = subprocess.run(['ping', '-c', '1', target_subnet], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	# print(result.stdout.decode('utf-8'))
 
-	print("SUBNET TERIDENTIFIKASI:\t" + ', '.join(trace_subnet	))
+	print("IDENTIFIED SUBNET:\t" + ', '.join(trace_subnet	))
 	
 	
 	for trace in trace_subnet:
@@ -171,7 +173,7 @@ def probe(target_subnet):
 					else:
 						print("HOST FOUND: \t" + regex_host_ip + ", verifying...")
 						on_verify.append(regex_host_ip)
-						print(on_verify, regex_host_ip)
+						#print(on_verify, regex_host_ip)
 						host_state = multiprocessing.Process(target=verify, args=(regex_host_ip,))
 						host_state.start()
 						# print('process started')
@@ -246,7 +248,7 @@ def classify_subnets():
 		confid = 100*(len(ips)/available_host)
 		confidence[subnet] = confid
 		print(f"Subnet {subnet}: {ips} " + str(confid) + "%")
-	print(max(confidence))
+	#print(max(confidence))
 	# cidr_ = ipaddress.ip_address
 	# 
 	# print(host_percentage)
@@ -254,7 +256,7 @@ def classify_subnets():
 
 
 def parsearg():
-	banner = "     e                 d8             ~~~~d88P ~~~888~~~ \n    d8b     888  888 _d88__  e88~-_      d88P     888    \n   /Y88b    888  888  888   d888   i    d88P      888    \n  /  Y88b   888  888  888   8888   |   d88P       888    \n /____Y88b  888  888  888   Y888   '  d88P        888    \n/      Y88b \"88_-888  \"88_/  \"88_-~  d88P____     888    \nAutomated Zero Trust Architecture by ReiKT. -h for help"
+	banner = "     e                 d8             ~~~~d88P ~~~888~~~ \n    d8b     888  888 _d88__  e88~-_      d88P     888    \n   /Y88b    888  888  888   d888   i    d88P      888    \n  /  Y88b   888  888  888   8888   |   d88P       888    \n /____Y88b  888  888  888   Y888   '  d88P        888    \n/      Y88b \"88_-888  \"88_/  \"88_-~  d88P____     888    \nAutomated Zero Trust Architecture by ReikalT (numburanggata). -h for help"
 	print(banner)
 	parser = argparse.ArgumentParser(description='Make sure masscan and nmap is installed and accessible from terminal/cmd')
 	parser.add_argument('--subnet', required=False, help="Comma-separated list of target subnets (e.g., 192.168.0.0/24,10.0.1.0/24)")

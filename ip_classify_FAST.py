@@ -61,7 +61,7 @@ def classify_subnets(ip_list):
                 
         
         # if not subnet_found:
-        for cidr in range(29, 21, -1): 
+        for cidr in range(29, 23, -1): 
             subnet = ipaddress.ip_network(f"{ip}/{cidr}", strict=False)
             # if any(ipaddress.ip_address(ip) in subnet for ip in ip_list):
             network = ipaddress.IPv4Network(subnet, strict=False)
@@ -92,7 +92,7 @@ def classify_subnets(ip_list):
         available_host = ((32 - int(cidr)) ** 2) - 2 
         # print(0.85*(len(ips)/available_host))
         # print(0.15*((29-int(cidr))/7))
-        subnet_rank.append([subnet, ips, ( 0.80*(len(ips)/available_host) + 0.20*((29-int(cidr))/7) )])
+        subnet_rank.append([subnet, ips, ( 0.70*(len(ips)/available_host) + 0.30*((29-int(cidr))/6) )])
 
     #RUMUS BEST SUBNET => (used IP/possible IP) * 75% + flexibility_factor * 25% 
     # BEST SUBNET = Host Utilization (Aspek Modular, Security) + Address Utilization (Aspek Fleksibilitas, Kesederhanaan)
